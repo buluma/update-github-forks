@@ -5,7 +5,8 @@
   "description": "Update/sync your GitHub forks in bulk.",
   "scripts": {
     "fetch": "node src/fetchRepos.js",
-    "update": "node src/updateRepos.js"
+    "update": "node src/updateRepos.js",
+    "test": "jest"
   },
   "dependencies": {
     "axios": "^0.31.1"
@@ -13,5 +14,9 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^30.3.0",
+    "nock": "^14.0.14"
+  }
 }

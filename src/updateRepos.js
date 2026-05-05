@@ -3,8 +3,6 @@ const config = require('./config');
 const fs = require('fs');
 const readline = require('readline');
 
-const reposForUpdate = require('./repos');
-
 async function getRepoInfo(fullName) {
   try {
     const res = await axios.get(`${config.api_url}/repos/${fullName}`, {
@@ -30,9 +28,9 @@ function generateShellScript(conflicts) {
     '# 1. Run this script: ./resolve-conflicts.sh',
     '# 2. It will pause before each rebase to let you resolve conflicts',
     '# 3. After resolving conflicts in each repo, continue with Ctrl+C or wait',
-            '',
-    'set -e  # Exit on any error',
-            '',
+    '',
+    'set -e',
+    '',
   ];
 
   conflicts.forEach(({ repo, upstreamUrl, defaultBranch, upstreamName }) => {
@@ -44,24 +42,20 @@ function generateShellScript(conflicts) {
       `echo "Branch: ${defaultBranch}"`,
       `echo "========================================"`,
       '',
-      `# Clone the fork (skip if already exists)`,
       `if [ ! -d "${repo.split('/')[1]}" ]; then`,
       `  git clone "https://github.com/${repo}.git"`,
       `fi`,
       '',
       `cd "${repo.split('/')[1]}"`,
       '',
-      `# Ensure upstream remote exists`,
       `if git remote | grep -q "^upstream$"; then`,
       `  git remote set-url upstream "${upstreamUrl}"`,
       `else`,
       `  git remote add upstream "${upstreamUrl}"`,
       `fi`,
       '',
-      `# Fetch upstream changes`,
       `git fetch upstream`,
       '',
-      `# Attempt to rebase fork onto upstream`,
       `echo "Attempting to rebase ${defaultBranch} onto upstream/${defaultBranch}..."`,
       `echo "If conflicts occur, resolve them, then stage changes and continue."`,
       `echo "Press Enter to continue or Ctrl+C to abort"`,
@@ -76,7 +70,6 @@ function generateShellScript(conflicts) {
       `  exit 1`,
       `}`,
       '',
-      `# Push updated fork back to GitHub`,
       `git push origin ${defaultBranch} --force-with-lease`,
       '',
       `echo "✅ ${repo} successfully synced with upstream!"`,
@@ -128,7 +121,6 @@ async function updateRepos(repos) {
     console.log(`\n⚠️  ${conflicts.length} repo(s) have merge conflicts and need manual resolution.`);
     console.log('Fetching upstream metadata for conflicted repos...');
 
-    // Fetch upstream info for each conflicted repo
     for (const conflict of conflicts) {
       const info = await getRepoInfo(conflict.repo);
       if (info) {
@@ -156,21 +148,36 @@ async function updateRepos(repos) {
   }
 }
 
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-  terminal: false,
-});
+function run() {
+  const reposForUpdate = require('./repos');
 
-console.log('The following repos will be updated (synced with upstream):');
-console.log(reposForUpdate.map((repo) => `- ${repo}`).join('\n'));
-console.log();
-console.log('Are you sure you want to update the following repos? y/n');
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    terminal: false,
+  });
 
-rl.on('line', async function (line) {
-  if (line.trim().toLowerCase() === 'y') {
-    console.log();
-    await updateRepos(reposForUpdate);
-  }
-  rl.close();
-});
+  console.log('The following repos will be updated (synced with upstream):');
+  console.log(reposForUpdate.map((repo) => `- ${repo}`).join('\n'));
+  console.log();
+  console.log('Are you sure you want to update the following repos? y/n');
+
+  rl.on('line', async function (line) {
+    if (line.trim().toLowerCase() === 'y') {
+      console.log();
+      await updateRepos(reposForUpdate);
+    }
+    rl.close();
+  });
+}
+
+// Export both the pure function and the runner
+module.exports = {
+  updateRepos,
+  run,
+};
+
+// If called directly, run the interactive mode
+if (require.main === module) {
+  run();
+}
